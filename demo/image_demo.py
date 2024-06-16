@@ -203,8 +203,31 @@ if __name__ == '__main__':
     else:
         images = [args.image]
 
-    # reparameterize texts
-    model.reparameterize(texts)
+    if 0:
+        # reparameterize texts
+        model.reparameterize(texts)
+    else:
+        if 0:
+            import inference
+
+            clip_model = inference.models.Clip(model_id="clip/ViT-B-32")
+            text_feats = clip_model.embed_text([t for text in texts for t in text])
+            text_feats = torch.from_numpy(text_feats)
+        else:
+            import clip  # vendorize
+            import onnxruntime
+
+            token = clip.tokenize([t for text in texts for t in text]).numpy().astype(int)
+            session = onnxruntime.InferenceSession("textual.onnx")
+            text_feats, = session.run(None, {"input": token})
+            text_feats = torch.from_numpy(text_feats)
+
+        text_feats = text_feats / text_feats.norm(p=2, dim=-1, keepdim=True)
+        text_feats = text_feats[:, None, :]
+
+        model.texts = texts
+        model.text_feats = text_feats  # 5, 1, 512
+
     progress_bar = ProgressBar(len(images))
     for image_path in images:
         inference_detector(model,
