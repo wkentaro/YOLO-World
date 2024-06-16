@@ -172,8 +172,22 @@ class DeployModel(nn.Module):
 
         return nms_func
 
-    def forward(self, inputs: Tensor):
-        neck_outputs = self.baseModel(inputs)
+    def forward(self, inputs: Tensor, text_feats: Tensor):
+        if 0:
+            if 0:
+                neck_outputs = self.baseModel(inputs)
+            else:
+                neck_outputs = self.baseModel._forward(inputs)
+        else:
+            # self.baseModel._forward {{
+            # self.baseModel.extract_feat {{
+            img_feats = self.baseModel.backbone.forward_image(inputs)
+            if self.baseModel.with_neck:
+                img_feats = self.baseModel.neck(img_feats, text_feats)
+            # }} self.baseModel.extract_feat
+            neck_outputs = self.baseModel.bbox_head.forward(img_feats, text_feats)
+            # }} self.baseModel._forward
+
         if self.with_postprocess:
             return self.pred_by_feat(*neck_outputs)
         else:

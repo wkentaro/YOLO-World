@@ -126,9 +126,15 @@ def main():
         texts = texts + [' ']
 
     baseModel = build_model_from_cfg(args.config, args.checkpoint, args.device)
-    if hasattr(baseModel, 'reparameterize'):
-        # reparameterize text into YOLO-World
-        baseModel.reparameterize([texts])
+    # if hasattr(baseModel, 'reparameterize'):
+    #     # reparameterize text into YOLO-World
+    #     baseModel.reparameterize([texts])
+
+    fake_input = torch.randn(args.batch_size, 3,
+                             *args.img_size).to(args.device)
+    fake_text_feats = torch.rand(args.batch_size, 80, 512).float().to(args.device)
+    fake_text_feats = fake_text_feats / fake_text_feats.norm(p=2, dim=-1, keepdim=True)
+
     deploy_model = DeployModel(baseModel=baseModel,
                                backend=backend,
                                postprocess_cfg=postprocess_cfg,
@@ -136,10 +142,8 @@ def main():
                                without_bbox_decoder=args.without_bbox_decoder)
     deploy_model.eval()
 
-    fake_input = torch.randn(args.batch_size, 3,
-                             *args.img_size).to(args.device)
     # dry run
-    deploy_model(fake_input)
+    # deploy_model(fake_input, fake_text_feats)
 
     save_onnx_path = os.path.join(
         args.work_dir,
@@ -147,9 +151,11 @@ def main():
     # export onnx
     with BytesIO() as f:
         torch.onnx.export(deploy_model,
-                          fake_input,
+                          # fake_input,
+                          (fake_input, fake_text_feats),
                           f,
-                          input_names=['images'],
+                          # input_names=["images"],
+                          input_names=["images", "text_features"],
                           output_names=output_names,
                           opset_version=args.opset)
         f.seek(0)
